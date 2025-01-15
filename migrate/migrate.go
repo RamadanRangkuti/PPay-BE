@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/ppay/initializers"
-	"github.com/ppay/routes"
+	"github.com/ppay/models"
 )
 
 func init() {
@@ -12,7 +11,5 @@ func init() {
 }
 
 func main() {
-	r := gin.Default()
-	routes.UserRoutes(r)
-	r.Run()
+	initializers.DB.AutoMigrate(&models.User{})
 }
