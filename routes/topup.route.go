@@ -8,6 +8,6 @@ import (
 func TopupRoute(router *gin.Engine) {
 	topupGroup := router.Group("/topup")
 	{
-		topupGroup.POST("", controllers.CreateUser)
+		topupGroup.POST("", controllers.Topup)
 	}
 }

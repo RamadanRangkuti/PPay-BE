@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/ppay/initializers"
 	"github.com/ppay/routes"
@@ -13,6 +14,14 @@ func init() {
 
 func main() {
 	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowAllOrigins: true,
+		AllowHeaders:    []string{"Authorization", "Content-Type"},
+		AllowMethods:    []string{"POST", "GET", "PATCH", "DELETE"},
+	}))
 	routes.UserRoutes(r)
+	routes.TopupRoute(r)
+	routes.AuthRoutes(r)
 	r.Run()
 }
