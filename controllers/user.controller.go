@@ -1,9 +1,12 @@
 package controllers
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pilinux/argon2"
 	"github.com/ppay/initializers"
 	"github.com/ppay/models"
 )
@@ -18,6 +21,12 @@ type UserResponse struct {
 	IsDeleted bool    `json:"is_deleted"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
+}
+
+func GetMd5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 // Create User and Wallet
@@ -35,6 +44,10 @@ func CreateUser(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if input.Password != "" {
+		input.Password, _ = argon2.CreateHash(input.Password, "", argon2.DefaultParams)
 	}
 
 	// Mulai transaksi
