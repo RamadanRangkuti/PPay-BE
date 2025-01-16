@@ -94,14 +94,19 @@ func CreateUser(c *gin.Context) {
 // Get All Users
 func GetUsers(c *gin.Context) {
 	var users []models.User
-	if err := initializers.DB.Where("is_deleted = ?", false).Find(&users).Error; err != nil {
+	search := c.Query("search")
+
+	query := initializers.DB.Where("is_deleted = ?", false)
+	if search != "" {
+		query = query.Where("fullname ILIKE ? OR phone ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if err := query.Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"users": users})
 }
 
-// Get User by ID
 func GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 

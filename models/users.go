@@ -6,11 +6,11 @@ import (
 
 type User struct {
 	ID        uint      `gorm:"primaryKey"`
-	Fullname  string    `gorm:"type:varchar(255);not null"`
-	Email     string    `gorm:"type:varchar(255);unique;not null"`
-	Password  string    `gorm:"type:varchar(255);not null"`
+	Fullname  string    `form:"fullname" gorm:"type:varchar(255);not null"`
+	Email     string    `form:"email" gorm:"type:varchar(255);unique;not null"`
+	Password  string    `form:"password" gorm:"type:varchar(255);not null"`
 	Pin       *string   `gorm:"type:char(6)"`
-	Phone     *string   `gorm:"type:varchar(16);unique"`
+	Phone     *string   `form:"phone" gorm:"type:varchar(16);unique"`
 	Image     *string   `gorm:"type:varchar(255)"`
 	IsDeleted bool      `gorm:"default:false"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
@@ -18,4 +18,8 @@ type User struct {
 
 	Wallet       Wallet        `gorm:"constraint:OnDelete:CASCADE"`
 	Transactions []Transaction `gorm:"constraint:OnDelete:CASCADE"`
+}
+
+type Token struct {
+	Token string `json:"token" form:"token"`
 }

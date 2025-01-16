@@ -1,7 +1,16 @@
 package controllers
 
 import (
+	"fmt"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/joho/godotenv"
+	"github.com/pilinux/argon2"
 	"github.com/ppay/initializers"
 	"github.com/ppay/lib"
 	"github.com/ppay/models"
@@ -63,9 +72,54 @@ func Register(c *gin.Context) {
 	tx.Commit()
 
 	response.Created("Register success", nil)
-	// c.JSON(http.StatusOK, gin.H{
-	// 	"message": "User and wallet created successfully",
-	// 	"user":    user,
-	// 	"wallet":  wallet,
-	// })
+}
+
+
+func Login(c *gin.Context) {
+	var formUser  models.User
+
+	if err := c.ShouldBind(&formUser) ; err != nil{
+		fmt.Println(err)
+	}
+	
+	response := lib.NewResponse(c)
+	godotenv.Load()
+
+	var user models.User
+	fmt.Println(formUser.Email)
+	if err := initializers.DB.Where("email = ? AND is_deleted = ?", formUser.Email, false).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	
+	var SECRET_KEY = os.Getenv("SECRET_KEY")
+	// fmt.Println(user.Password)
+	match, err := argon2.ComparePasswordAndHash(formUser.Password, SECRET_KEY, user.Password)
+	// fmt.Println(match)
+	if err != nil || !match {
+		response.BadRequest("Invalid email or password", nil)
+		return
+	}
+
+	godotenv.Load()
+
+	var JWT_SECRET []byte = []byte(GetMd5Hash(os.Getenv("JWT_SECRET")))
+
+	signer, _ := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: JWT_SECRET}, (nil))
+	baseInfo := jwt.Claims{
+		IssuedAt: jwt.NewNumericDate(time.Now()),
+	}
+	payload := struct {
+		UserId int `json:"userId"`
+	}{
+		UserId: int(user.ID),
+	}
+
+	token, _ := jwt.Signed(signer).Claims(baseInfo).Claims(payload).Serialize()
+
+	tok := models.Token{
+		Token: token,
+	}
+
+	response.Success("login success", tok)
 }
