@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,7 @@ func Topup(c *gin.Context) {
 
 	if err := tx.Create(&transaction).Error; err != nil {
         tx.Rollback()
+		fmt.Println(err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction"})
         return
     }
