@@ -14,5 +14,7 @@ func init() {
 func main() {
 	r := gin.Default()
 	routes.UserRoutes(r)
+	routes.TopupRoute(r)
+	routes.AuthRoutes(r)
 	r.Run()
 }

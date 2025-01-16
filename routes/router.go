@@ -8,4 +8,5 @@ import (
 func RegisterRoutes(router *gin.Engine) {
 	UserRoutes(router)
 	TopupRoute(router)
+	AuthRoutes(router)
 }
