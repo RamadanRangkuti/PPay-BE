@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/ppay/initializers"
-	"github.com/ppay/routes"
+	"github.com/ppay/internal/initializers"
+	"github.com/ppay/internal/routes"
 )
 
 func init() {
