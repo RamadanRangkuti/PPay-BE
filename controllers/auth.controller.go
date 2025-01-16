@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/ppay/initializers"
 	"github.com/ppay/lib"
@@ -19,9 +17,12 @@ func Register(c *gin.Context) {
 		Image    *string `json:"image"`
 	}
 
+	response := lib.NewResponse(c)
+
 	// Validate input
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest("Invalid input", nil)
+		// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -40,7 +41,8 @@ func Register(c *gin.Context) {
 
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		response.InternalServerError("Failed to create user", nil)
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
 
@@ -52,16 +54,18 @@ func Register(c *gin.Context) {
 
 	if err := tx.Create(&wallet).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create wallet"})
+		response.InternalServerError("Failed to create wallet", nil)
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create wallet"})
 		return
 	}
 
 	// Commit transaksi
 	tx.Commit()
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User and wallet created successfully",
-		"user":    user,
-		"wallet":  wallet,
-	})
+	response.Created("Register success", nil)
+	// c.JSON(http.StatusOK, gin.H{
+	// 	"message": "User and wallet created successfully",
+	// 	"user":    user,
+	// 	"wallet":  wallet,
+	// })
 }

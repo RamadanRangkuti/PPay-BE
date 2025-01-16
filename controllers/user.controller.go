@@ -32,7 +32,7 @@ func GetMd5Hash(text string) string {
 // Create User and Wallet
 func CreateUser(c *gin.Context) {
 	var input struct {
-		Fullname string  `json:"fullname" binding:"required"`
+		Fullname string  `json:"fullname"`
 		Email    string  `json:"email" binding:"required,email"`
 		Password string  `json:"password" binding:"required,min=6"`
 		Pin      *string `json:"pin"`
