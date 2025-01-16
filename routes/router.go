@@ -7,5 +7,5 @@ import (
 
 func RegisterRoutes(router *gin.Engine) {
 	UserRoutes(router)
-	// TransactionRoutes(router)
+	TopupRoute(router)
 }
