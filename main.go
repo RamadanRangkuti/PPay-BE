@@ -22,6 +22,7 @@ func main() {
 	}))
 	routes.UserRoutes(r)
 	routes.TopupRoute(r)
+	routes.TransferRoute(r)
 	routes.AuthRoutes(r)
 	r.Run()
 }

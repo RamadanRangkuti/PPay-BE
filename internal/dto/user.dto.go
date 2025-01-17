@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type UserSummaryDTO struct {
-	Id       int     `json:"id"`
+	Id uint `json:"id"`
 	Image    *string `json:"image"`
 	Email    string  `json:"email,omitempty"`
 	Fullname string  `json:"fullname"`
