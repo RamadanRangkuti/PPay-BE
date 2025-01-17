@@ -113,7 +113,7 @@ func GetUsers(c *gin.Context) {
 	// Query database with filters and pagination
 	var users []dto.UserSummaryDTO
 	query := initializers.DB.Model(&models.User{}).
-		Select("fullname, phone, image").
+		Select("id, fullname, phone, image").
 		Where("is_deleted = ?", false)
 
 	// Apply search filter if provided
@@ -178,7 +178,7 @@ func GetUserByID(c *gin.Context) {
 
 	// Query only required fields
 	if err := initializers.DB.Model(&models.User{}).
-		Select("image, fullname, phone").
+		Select("email, image, fullname, phone").
 		Where("id = ? AND is_deleted = ?", id, false).
 		First(&userSummary).Error; err != nil {
 		response.NotFound("User not found", nil)
@@ -192,7 +192,7 @@ func GetUserByID(c *gin.Context) {
 func UpdateUser(c *gin.Context) {
 	response := lib.NewResponse(c)
 
-	// Ambil userId dari konteks (biasanya diatur dari middleware)
+	// Ambil userId dari konteks
 	userId, exists := c.Get("UserId")
 	if !exists {
 		response.Unauthorized("Unauthorized", nil)
@@ -210,6 +210,7 @@ func UpdateUser(c *gin.Context) {
 		response.NotFound(fmt.Sprintf("User with ID %d not found", id), nil)
 		return
 	}
+	fmt.Println("Existing User:", user)
 
 	// Bind input data
 	var req dto.UpdateUserRequest
@@ -230,10 +231,12 @@ func UpdateUser(c *gin.Context) {
 			response.BadRequest("Password must be at least 8 characters long", nil)
 			return
 		}
-		user.Password = lib.GenerateHash(*req.Password)
+		hashedPassword := lib.GenerateHash(*req.Password)
+		user.Password = hashedPassword
 	}
 	if req.Pin != nil {
-		user.Pin = req.Pin
+		hashPin := lib.GenerateHash(*req.Pin)
+		user.Pin = &hashPin
 	}
 	if req.Phone != nil {
 		user.Phone = req.Phone
@@ -253,7 +256,7 @@ func UpdateUser(c *gin.Context) {
 
 	// Respon sukses
 	response.Success("Update user success", dto.UserSummaryDTO{
-		Image:    user.Image,
+		Id:       int(user.ID),
 		Fullname: user.Fullname,
 		Phone:    user.Phone,
 	})
