@@ -7,7 +7,7 @@ import (
 type Transaction struct {
 	ID              uint      `gorm:"primaryKey"`
 	UserID          uint      `gorm:"not null;constraint:OnDelete:CASCADE"`
-	Amount          float64   `gorm:"type:money;not null"`
+	Amount          float64   `form:"amount" gorm:"type:money;not null"`
 	TransactionType string    `gorm:"type:transaction_type_enum;not null"`
 	Notes           *string   `gorm:"type:varchar(255)"`
 	IsDeleted       bool      `gorm:"default:false"`
