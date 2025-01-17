@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pilinux/argon2"
@@ -158,8 +159,41 @@ func GetUsers(c *gin.Context) {
 
 func GetUserByID(c *gin.Context) {
 	response := lib.NewResponse(c)
+
+	// Get user ID from context
 	userId, exists := c.Get("UserId")
-	fmt.Println(userId)
+	if !exists {
+		response.Unauthorized("Unauthorized", nil)
+		return
+	}
+
+	id, ok := userId.(int)
+	if !ok {
+		response.InternalServerError("Failed to parse user ID from token", nil)
+		return
+	}
+
+	// Use DTO for selected fields
+	var userSummary dto.UserSummaryDTO
+
+	// Query only required fields
+	if err := initializers.DB.Model(&models.User{}).
+		Select("image, fullname, phone").
+		Where("id = ? AND is_deleted = ?", id, false).
+		First(&userSummary).Error; err != nil {
+		response.NotFound("User not found", nil)
+		return
+	}
+
+	// Return response with filtered data
+	response.Success("Success get user", userSummary)
+}
+
+func UpdateUser(c *gin.Context) {
+	response := lib.NewResponse(c)
+
+	// Ambil userId dari konteks (biasanya diatur dari middleware)
+	userId, exists := c.Get("UserId")
 	if !exists {
 		response.Unauthorized("Unauthorized", nil)
 		return
@@ -170,96 +204,92 @@ func GetUserByID(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := initializers.DB.Where("id = ? AND is_deleted = ?", id, false).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"user": user})
-}
-
-func UpdateUser(c *gin.Context) {
-	id := c.Param("id")
-
-	var input struct {
-		Fullname string  `json:"fullname"`
-		Email    string  `json:"email" binding:"omitempty,email"`
-		Password string  `json:"password" binding:"omitempty,min=6"`
-		Pin      *string `json:"pin"`
-		Phone    *string `json:"phone"`
-		Image    *string `json:"image"`
-	}
-
-	// Validate input
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
+	// Cari data user berdasarkan ID
 	var user models.User
 	if err := initializers.DB.First(&user, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		response.NotFound(fmt.Sprintf("User with ID %d not found", id), nil)
 		return
 	}
 
-	// Update fields
-	if input.Fullname != "" {
-		user.Fullname = input.Fullname
-	}
-	if input.Email != "" {
-		user.Email = input.Email
-	}
-	if input.Password != "" {
-		user.Password = input.Password
-	}
-	if input.Pin != nil {
-		user.Pin = input.Pin
-	}
-	if input.Phone != nil {
-		user.Phone = input.Phone
-	}
-	if input.Image != nil {
-		user.Image = input.Image
+	// Bind input data
+	var req dto.UpdateUserRequest
+	if err := c.ShouldBind(&req); err != nil {
+		response.BadRequest("Invalid input", err.Error())
+		return
 	}
 
-	// Save the user
+	// Update data hanya jika ada input
+	if req.Fullname != nil {
+		user.Fullname = *req.Fullname
+	}
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+	if req.Password != nil {
+		if !IsValidPassword(*req.Password) {
+			response.BadRequest("Password must be at least 8 characters long", nil)
+			return
+		}
+		user.Password = lib.GenerateHash(*req.Password)
+	}
+	if req.Pin != nil {
+		user.Pin = req.Pin
+	}
+	if req.Phone != nil {
+		user.Phone = req.Phone
+	}
+	if req.Image != nil {
+		user.Image = req.Image
+	}
+
+	// Perbarui waktu
+	user.UpdatedAt = time.Now()
+
+	// Simpan perubahan ke database
 	if err := initializers.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalServerError("Failed to update user", err.Error())
 		return
 	}
 
-	// Create response with UserResponse struct
-	// response := UserResponse{
-	// 	ID:        user.ID,
-	// 	Fullname:  user.Fullname,
-	// 	Email:     user.Email,
-	// 	Pin:       user.Pin,
-	// 	Phone:     user.Phone,
-	// 	Image:     user.Image,
-	// 	IsDeleted: user.IsDeleted,
-	// 	CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"), // Format waktu jika perlu
-	// 	UpdatedAt: user.UpdatedAt.Format("2006-01-02 15:04:05"), // Format waktu jika perlu
-	// }
-
-	// c.JSON(http.StatusOK, gin.H{"message": "User updated successfully", "user": response})
+	// Respon sukses
+	response.Success("Update user success", dto.UserSummaryDTO{
+		Image:    user.Image,
+		Fullname: user.Fullname,
+		Phone:    user.Phone,
+	})
 }
 
 // Delete User
 func DeleteUser(c *gin.Context) {
-	id := c.Param("id")
+	response := lib.NewResponse(c)
 
+	// Ambil userId dari konteks
+	userId, exists := c.Get("UserId")
+	if !exists {
+		response.Unauthorized("Unauthorized", nil)
+		return
+	}
+	id, ok := userId.(int)
+	if !ok {
+		response.InternalServerError("Failed to parse user ID from token", nil)
+		return
+	}
+
+	// Cari data user
 	var user models.User
 	if err := initializers.DB.First(&user, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		response.NotFound(fmt.Sprintf("User with ID %d not found", id), nil)
 		return
 	}
 
+	// Hapus user (soft delete)
 	user.IsDeleted = true
+	user.UpdatedAt = time.Now()
 	if err := initializers.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.InternalServerError("Failed to delete user", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+	// Respon sukses
+	response.Success(fmt.Sprintf("User with ID %d deleted successfully", id), nil)
 }
