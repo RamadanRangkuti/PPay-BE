@@ -1,0 +1,18 @@
+package routes
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/ppay/internal/controllers"
+	"github.com/ppay/internal/middlewares"
+)
+
+func UserRoutes(router *gin.Engine) {
+	userGroup := router.Group("/users")
+	{
+		userGroup.GET("", controllers.GetUsers)
+		userGroup.GET("/:id", middlewares.ValidateToken(), controllers.GetUserByID)
+		userGroup.POST("", controllers.Register)
+		userGroup.PATCH("/:id", middlewares.ValidateToken(), controllers.UpdateUser)
+		userGroup.DELETE("/:id", middlewares.ValidateToken(), controllers.DeleteUser)
+	}
+}
