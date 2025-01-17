@@ -1,6 +1,7 @@
 package dto
 
 type UserSummaryDTO struct {
+	Id uint `json:"id"`
 	Image    *string `json:"image"`
 	Fullname string  `json:"fullname"`
 	Phone    *string `json:"phone"`

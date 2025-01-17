@@ -178,10 +178,11 @@ func GetUserByID(c *gin.Context) {
 
 	// Query only required fields
 	if err := initializers.DB.Model(&models.User{}).
-		Select("image, fullname, phone").
+		Select("id, image, fullname, phone").
 		Where("id = ? AND is_deleted = ?", id, false).
 		First(&userSummary).Error; err != nil {
 		response.NotFound("User not found", nil)
+		fmt.Println(err)
 		return
 	}
 
@@ -198,6 +199,7 @@ func UpdateUser(c *gin.Context) {
 		response.Unauthorized("Unauthorized", nil)
 		return
 	}
+
 	id, ok := userId.(int)
 	if !ok {
 		response.InternalServerError("Failed to parse user ID from token", nil)
