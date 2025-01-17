@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pilinux/argon2"
 	"github.com/ppay/internal/dto"
 	"github.com/ppay/internal/initializers"
 	"github.com/ppay/internal/models"
@@ -17,14 +16,8 @@ import (
 
 // Create User and Wallet
 func CreateUser(c *gin.Context) {
-	var input struct {
-		Fullname string  `json:"fullname"`
-		Email    string  `json:"email" binding:"required,email"`
-		Password string  `json:"password" binding:"required,min=6"`
-		Pin      *string `json:"pin"`
-		Phone    *string `json:"phone"`
-		Image    *string `json:"image"`
-	}
+
+	var input dto.CreateUserRequest
 
 	// Validate input
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -33,7 +26,8 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if input.Password != "" {
-		input.Password, _ = argon2.CreateHash(input.Password, "", argon2.DefaultParams)
+		hasher := lib.GenerateHash(input.Password)
+		input.Password = hasher
 	}
 
 	// Mulai transaksi
@@ -41,7 +35,7 @@ func CreateUser(c *gin.Context) {
 
 	// Buat User
 	user := models.User{
-		Fullname: input.Fullname,
+		Fullname: *input.Fullname,
 		Email:    input.Email,
 		Password: input.Password,
 		Pin:      input.Pin,
