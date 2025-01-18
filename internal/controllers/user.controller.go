@@ -162,6 +162,7 @@ func GetUserByID(c *gin.Context) {
 
 	// Get user ID from context
 	userId, exists := c.Get("UserId")
+	fmt.Println(userId)
 	if !exists {
 		response.Unauthorized("Unauthorized", nil)
 		return
