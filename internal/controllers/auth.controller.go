@@ -105,6 +105,16 @@ func GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	// Query ke database untuk mencari user berdasarkan email
 	if err := initializers.DB.Where("email = ? AND is_deleted = ?", email, false).First(&user).Error; err != nil {
+		fmt.Println("error query", err.Error())
+		return nil, err // Kembalikan error jika user tidak ditemukan
+	}
+	return &user, nil
+}
+
+func GetUserByPhone(phone string) (*models.User, error) {
+	var user models.User
+	// Query ke database untuk mencari user berdasarkan email
+	if err := initializers.DB.Where("phone = ? AND is_deleted = ?", phone, false).First(&user).Error; err != nil {
 		return nil, err // Kembalikan error jika user tidak ditemukan
 	}
 	return &user, nil
