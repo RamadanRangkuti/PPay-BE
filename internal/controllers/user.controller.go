@@ -262,6 +262,7 @@ func GetUserByID(c *gin.Context) {
 
 func UpdateUser(c *gin.Context) {
 	response := lib.NewResponse(c)
+	file, _ := c.FormFile("image")
 
 	// Ambil userId dari konteks
 	userId, exists := c.Get("UserId")
@@ -281,13 +282,35 @@ func UpdateUser(c *gin.Context) {
 		response.NotFound(fmt.Sprintf("User with ID %d not found", id), nil)
 		return
 	}
-	fmt.Println("Existing User:", user)
 
 	// Bind input data
 	var req dto.UpdateUserRequest
 	if err := c.ShouldBind(&req); err != nil {
-		response.BadRequest("Invalid input", err.Error())
-		return
+		validationErrors, ok := err.(validator.ValidationErrors)
+		if !ok {
+			response.BadRequest("Invalid input", err.Error())
+			return
+		}
+		for _, fieldError := range validationErrors {
+			switch fieldError.Field() {
+			case "Phone":
+				if fieldError.Tag() == "registered" {
+					response.BadRequest("Phone is registered", nil)
+					return
+				}
+			case "Pin":
+				if fieldError.Tag() == "min" {
+					response.BadRequest("Pin must be at least 6 characters long", nil)
+					return
+				} else if fieldError.Tag() == "max" {
+					response.BadRequest("Pin must be no more than 6 characters long", nil)
+					return
+				}
+			default:
+				response.BadRequest("Invalid input", fieldError.Error())
+				return
+			}
+		}
 	}
 
 	// Update data hanya jika ada input
@@ -312,8 +335,17 @@ func UpdateUser(c *gin.Context) {
 	if req.Phone != nil {
 		user.Phone = req.Phone
 	}
-	if req.Image != nil {
-		user.Image = req.Image
+	if file != nil {
+		allowedExts := []string{".jpg", ".jpeg", ".png"}
+		maxSize := int64(2 << 20) // 2MB
+		uploadDir := "public/images"
+
+		imagePath, err := lib.UploadImage(c, file, allowedExts, maxSize, uploadDir)
+		if err != nil {
+			response.BadRequest("Failed to upload image", err.Error())
+			return
+		}
+		user.Image = &imagePath
 	}
 
 	// Perbarui waktu
@@ -328,9 +360,19 @@ func UpdateUser(c *gin.Context) {
 	// Respon sukses
 	response.Success("Update user success", dto.UserSummaryDTO{
 		Id:       int(user.ID),
+		Email:    user.Email,
 		Fullname: user.Fullname,
+		Image:    user.Image,
 		Phone:    user.Phone,
 	})
+}
+
+func GetUserByIDParam(userID int) (*models.User, error) {
+	var user models.User
+	if err := initializers.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // Delete User
