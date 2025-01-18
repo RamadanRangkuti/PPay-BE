@@ -1,4 +1,4 @@
--- Active: 1736995167018@@127.0.0.1@5432@ppay
+-- Active: 1737183560393@@localhost@5432@testing
 -- ENUM for transaction types
 CREATE TYPE transaction_type_enum AS ENUM ('top_up', 'transfer');
 
