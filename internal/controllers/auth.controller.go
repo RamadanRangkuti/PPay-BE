@@ -120,6 +120,38 @@ func GetUserByPhone(phone string) (*models.User, error) {
 	return &user, nil
 }
 
+func VerifPin(c *gin.Context) {
+	response := lib.NewResponse(c)
+	// Get user ID from context
+	userId, exists := c.Get("UserId")
+	if !exists {
+		response.Unauthorized("Unauthorized", nil)
+		return
+	}
+
+	id, ok := userId.(int)
+	if !ok {
+		response.InternalServerError("Failed to parse user ID from token", nil)
+		return
+	}
+
+	var input dto.PinDTO
+	if err := c.ShouldBind(&input); err != nil {
+		fmt.Println(err)
+	}
+
+	user, err := GetUserByIDParam(id)
+	if err != nil {
+		response.BadRequest("User not found", nil)
+		return
+	}
+	if user.Pin == nil || !lib.VerifyHash(input.Pin, *user.Pin) {
+		response.BadRequest("Invalid PIN", nil)
+		return
+	}
+	response.Success("Pin Valid", nil)
+}
+
 func IsValidEmail(email string) bool {
 	if len(email) < 5 || !strings.Contains(email, "@") || !strings.Contains(email, ".") {
 		return false
