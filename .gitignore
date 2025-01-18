@@ -1,2 +1,8 @@
 .env
+<<<<<<< HEAD
 tmp
+=======
+.fresh.yaml
+tmp/
+.vscode/
+>>>>>>> main

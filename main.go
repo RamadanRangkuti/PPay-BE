@@ -23,6 +23,7 @@ func main() {
 	r.Static("/public/images", "public/images")
 	routes.UserRoutes(r)
 	routes.TopupRoute(r)
+	routes.TransferRoute(r)
 	routes.AuthRoutes(r)
 	r.Run()
 }
