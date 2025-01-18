@@ -62,7 +62,7 @@ func GetTransactionHistory(c *gin.Context) {
 	var transactions []TransactionHistoryResponse
 	query := `
         SELECT t.id, 
-               CAST(REPLACE(REPLACE(t.amount::text, '$', ''), ',', '') AS FLOAT) AS amount, 
+               amount, 
                t.transaction_type, 
                t.notes, 
                to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
