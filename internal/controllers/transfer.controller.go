@@ -12,7 +12,7 @@ import (
 
 func Transfer(c *gin.Context) {
 	var input struct {
-		Amount          float64 `form:"amount" json:"amount" binding:"required"`
+		Amount float64 `form:"amount" json:"amount" binding:"required"`
 	}
 
 	response := lib.NewResponse(c)
@@ -56,7 +56,7 @@ func Transfer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction", "details": err.Error()})
 		return
 	}
-	
+
 	targetId, _ := strconv.Atoi(c.Param("id"))
 
 	var userSummary models.User
@@ -70,8 +70,8 @@ func Transfer(c *gin.Context) {
 
 	// Create the top-up transaction record
 	transfer := models.TransferTransaction{
-		TransactionID:   transaction.ID,
-		TargetUserID: uint(targetId),
+		TransactionID: transaction.ID,
+		TargetUserID:  uint(targetId),
 	}
 
 	if err := tx.Create(&transfer).Error; err != nil {
@@ -83,7 +83,7 @@ func Transfer(c *gin.Context) {
 	var wallet models.Wallet
 	wallet.Balance -= input.Amount
 	wallet.UserID = uint(id)
-	
+
 	if err := tx.Save(&wallet).Error; err != nil {
 		tx.Rollback()
 		response.InternalServerError("Failed to update wallet balance", err.Error())
@@ -93,7 +93,7 @@ func Transfer(c *gin.Context) {
 	var walletTarget models.Wallet
 	walletTarget.Balance += input.Amount
 	walletTarget.UserID = uint(targetId)
-	
+
 	if err := tx.Save(&walletTarget).Error; err != nil {
 		tx.Rollback()
 		response.InternalServerError("Failed to update wallet balance", err.Error())
@@ -111,14 +111,14 @@ func Transfer(c *gin.Context) {
 		"message": "Top-up transaction created successfully",
 		"transaction": map[string]interface{}{
 			"id":         transaction.ID,
-			"userId": userId,
+			"userId":     userId,
 			"amount":     transaction.Amount,
 			"type":       transaction.TransactionType,
 			"created_at": transaction.CreatedAt,
 			"top_up": map[string]interface{}{
-				"id":             transfer.ID,
+				"id":           transfer.ID,
 				"targetUserId": targetId,
-				"created_at":     transfer.CreatedAt,
+				"created_at":   transfer.CreatedAt,
 			},
 		},
 	})
