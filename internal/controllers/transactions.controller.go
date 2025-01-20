@@ -48,6 +48,7 @@ func GetTransactionHistory(c *gin.Context) {
 	// Parsing parameter query
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	search := c.DefaultQuery("search", "")
 
 	if page < 1 {
 		response.BadRequest("Invalid page number", nil)
@@ -75,98 +76,135 @@ func GetTransactionHistory(c *gin.Context) {
 	// Query untuk mengambil riwayat transaksi dengan informasi pengguna
 	var transactions []TransactionHistoryResponse
 	query := `
-		-- Transfers where the user is the sender (Sent)
-		SELECT 
-			t.id,
-			'Sent' AS transaction_type,
-			u.image AS user_image,
-			u.fullname AS user_fullname,
-			u.phone AS user_phone,
-			t.amount,
-			target_u.image AS related_user_image,
-			target_u.fullname AS related_user_fullname,
-			target_u.phone AS related_user_phone,
-			to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
-		FROM 
-			users u
-		JOIN 
-			transactions t ON u.id = t.user_id
-		JOIN 
-			transfer_transactions tt ON tt.transaction_id = t.id
-		JOIN 
-			users target_u ON target_u.id = tt.target_user_id
-		WHERE 
-			t.user_id = ?  
+-- Transfers where the user is the sender (Sent)
+SELECT 
+    t.id,
+    'Sent' AS transaction_type,
+    u.image AS user_image,
+    u.fullname AS user_fullname,
+    u.phone AS user_phone,
+    t.amount,
+    target_u.image AS related_user_image,
+    target_u.fullname AS related_user_fullname,
+    target_u.phone AS related_user_phone,
+    to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
+FROM 
+    users u
+JOIN 
+    transactions t ON u.id = t.user_id
+JOIN 
+    transfer_transactions tt ON tt.transaction_id = t.id
+JOIN 
+    users target_u ON target_u.id = tt.target_user_id
+WHERE 
+    t.user_id = ?  
+    AND (
+        u.fullname ILIKE ? OR 
+        u.phone ILIKE ? OR 
+        target_u.fullname ILIKE ? OR 
+        target_u.phone ILIKE ?
+    )
 
-		UNION ALL
+UNION ALL
 
-		-- Transfers where the user is the recipient (Received)
-		SELECT 
-			t.id,
-			'Received' AS transaction_type,
-			target_u.image AS user_image,
-			target_u.fullname AS user_fullname,
-			target_u.phone AS user_phone,
-			t.amount,
-			u.image AS related_user_image,
-			u.fullname AS related_user_fullname,
-			u.phone AS related_user_phone,
-			to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
-		FROM 
-			users u
-		JOIN 
-			transactions t ON u.id = t.user_id
-		JOIN 
-			transfer_transactions tt ON tt.transaction_id = t.id
-		JOIN 
-			users target_u ON target_u.id = tt.target_user_id
-		WHERE 
-			tt.target_user_id = ?  
+-- Transfers where the user is the recipient (Received)
+SELECT 
+    t.id,
+    'Received' AS transaction_type,
+    target_u.image AS user_image,
+    target_u.fullname AS user_fullname,
+    target_u.phone AS user_phone,
+    t.amount,
+    u.image AS related_user_image,
+    u.fullname AS related_user_fullname,
+    u.phone AS related_user_phone,
+    to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
+FROM 
+    users u
+JOIN 
+    transactions t ON u.id = t.user_id
+JOIN 
+    transfer_transactions tt ON tt.transaction_id = t.id
+JOIN 
+    users target_u ON target_u.id = tt.target_user_id
+WHERE 
+    tt.target_user_id = ?  
+    AND (
+        target_u.fullname ILIKE ? OR 
+        target_u.phone ILIKE ? OR 
+        u.fullname ILIKE ? OR 
+        u.phone ILIKE ?
+    )
 
-		UNION ALL
+UNION ALL
 
-		-- Top-up history (Top-Up)
-		SELECT 
-			t.id,
-			'Top-Up' AS transaction_type,
-			u.image AS user_image,
-			u.fullname AS user_fullname,
-			u.phone AS user_phone,
-			t.amount,
-			NULL AS related_user_image,
-			pm.name AS related_user_fullname,
-			NULL AS related_user_phone,
-			to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
-		FROM 
-			users u
-		JOIN 
-			transactions t ON u.id = t.user_id
-		JOIN 
-			topup_transactions tu ON tu.transaction_id = t.id
-		JOIN 
-			payment_methods pm ON pm.id = tu.payment_method_id
-		WHERE 
-			t.user_id = ?  
+-- Top-up history (Top-Up)
+SELECT 
+    t.id,
+    'Top-Up' AS transaction_type,
+    u.image AS user_image,
+    u.fullname AS user_fullname,
+    u.phone AS user_phone,
+    t.amount,
+    NULL AS related_user_image,
+    pm.name AS related_user_fullname,
+    NULL AS related_user_phone,
+    to_char(t.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
+FROM 
+    users u
+JOIN 
+    transactions t ON u.id = t.user_id
+JOIN 
+    topup_transactions tu ON tu.transaction_id = t.id
+JOIN 
+    payment_methods pm ON pm.id = tu.payment_method_id
+WHERE 
+    t.user_id = ?  
+    AND (
+        u.fullname ILIKE ? OR 
+        u.phone ILIKE ? OR 
+        pm.name ILIKE ?
+    )
 
-		ORDER BY 
-			created_at DESC
-		LIMIT ? OFFSET ?;
-	`
+ORDER BY 
+    created_at DESC
+LIMIT ? OFFSET ?;`
+
+	searchQuery := "%" + search + "%"
 
 	// Menjalankan query
-	if err := initializers.DB.Raw(query, id, id, id, limit, offset).Scan(&transactions).Error; err != nil {
+	if err := initializers.DB.Raw(query, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, searchQuery, searchQuery, limit, offset).Scan(&transactions).Error; err != nil {
 		response.InternalServerError("Failed to retrieve transaction history", err.Error())
 		return
 	}
 
 	// Menghitung total transaksi untuk pagination
 	var totalCount int64
-	countQuery := `
-		SELECT COUNT(*)
-		FROM transactions t
-		WHERE t.user_id = ? AND t.is_deleted = false
-	`
-	if err := initializers.DB.Raw(countQuery, id).Scan(&totalCount).Error; err != nil {
+	var countQuery string
+	var queryArgs []interface{}
+
+	if searchQuery == "" {
+		countQuery = `
+        SELECT COUNT(*)
+        FROM transactions t
+        WHERE t.user_id = ? AND t.is_deleted = false`
+
+		queryArgs = []interface{}{id}
+	} else {
+		countQuery =
+			`SELECT COUNT(*)
+        FROM transactions t
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.user_id = ? AND t.is_deleted = false
+        AND (
+            u.fullname ILIKE ? OR u.phone ILIKE ?
+        )`
+
+		searchParam := "%" + searchQuery + "%"
+		queryArgs = []interface{}{id, searchParam, searchParam}
+	}
+
+	if err := initializers.DB.Raw(countQuery, queryArgs...).Scan(&totalCount).Error; err != nil {
 		response.InternalServerError("Failed to count transactions", err.Error())
 		return
 	}
