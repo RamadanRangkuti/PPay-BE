@@ -28,24 +28,25 @@ type ExpenseResponse struct {
 }
 
 // Struct untuk response transaksi
+// Struct for transaction response
 type TransactionHistoryResponse struct {
-	ID                  uint    `json:"id"`                              // ID transaksi
-	TransactionType     string  `json:"transaction_type"`                // 'Sent', 'Received', 'Top-Up'
-	UserImage           *string `json:"user_image,omitempty"`            // Gambar pengguna
-	UserFullname        *string `json:"user_fullname,omitempty"`         // Nama lengkap pengguna
-	UserPhone           *string `json:"user_phone,omitempty"`            // Nomor telepon pengguna
-	Amount              float64 `json:"amount"`                          // Jumlah transaksi
-	RelatedUserImage    *string `json:"related_user_image,omitempty"`    // Gambar pengguna yang terkait
-	RelatedUserFullname *string `json:"related_user_fullname,omitempty"` // Nama lengkap pengguna yang terkait
-	RelatedUserPhone    *string `json:"related_user_phone,omitempty"`    // Nomor telepon pengguna yang terkait
-	CreatedAt           string  `json:"created_at"`                      // Timestamp transaksi
+	ID                  uint    `json:"id"`
+	TransactionType     string  `json:"transaction_type"`
+	UserImage           *string `json:"user_image,omitempty"`
+	UserFullname        *string `json:"user_fullname,omitempty"`
+	UserPhone           *string `json:"user_phone,omitempty"`
+	Amount              float64 `json:"amount"`
+	RelatedUserImage    *string `json:"related_user_image,omitempty"`
+	RelatedUserFullname *string `json:"related_user_fullname,omitempty"`
+	RelatedUserPhone    *string `json:"related_user_phone,omitempty"`
+	CreatedAt           string  `json:"created_at"`
 }
 
-// Function untuk mendapatkan riwayat transaksi
+// Function to get transaction history
 func GetTransactionHistory(c *gin.Context) {
 	response := lib.NewResponse(c)
 
-	// Parsing parameter query
+	// Parse query parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.DefaultQuery("search", "")
@@ -61,7 +62,7 @@ func GetTransactionHistory(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	// Mendapatkan user ID dari context
+	// Get user ID from context
 	userID, exists := c.Get("UserId")
 	if !exists {
 		response.Unauthorized("Unauthorized", nil)
@@ -73,7 +74,7 @@ func GetTransactionHistory(c *gin.Context) {
 		return
 	}
 
-	// Query untuk mengambil riwayat transaksi dengan informasi pengguna
+	// Query to fetch transactions
 	var transactions []TransactionHistoryResponse
 	query := `
 -- Transfers where the user is the sender (Sent)
@@ -161,8 +162,6 @@ JOIN
 WHERE 
     t.user_id = ?  
     AND (
-        u.fullname ILIKE ? OR 
-        u.phone ILIKE ? OR 
         pm.name ILIKE ?
     )
 
@@ -172,62 +171,79 @@ LIMIT ? OFFSET ?;`
 
 	searchQuery := "%" + search + "%"
 
-	// Menjalankan query
-	if err := initializers.DB.Raw(query, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, searchQuery, searchQuery, limit, offset).Scan(&transactions).Error; err != nil {
+	// Execute query
+	if err := initializers.DB.Raw(query, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, searchQuery, searchQuery, searchQuery, id, searchQuery, limit, offset).Scan(&transactions).Error; err != nil {
 		response.InternalServerError("Failed to retrieve transaction history", err.Error())
 		return
 	}
 
-	// Menghitung total transaksi untuk pagination
+	// Query to count total transactions
 	var totalCount int64
-	var countQuery string
-	var queryArgs []interface{}
+	countQuery := `
+SELECT COUNT(*)
+FROM (
+    -- Transfers where the user is the sender (Sent)
+    SELECT t.id
+    FROM users u
+    JOIN transactions t ON u.id = t.user_id
+    JOIN transfer_transactions tt ON tt.transaction_id = t.id
+    JOIN users target_u ON target_u.id = tt.target_user_id
+    WHERE t.user_id = ?
+      AND (u.fullname ILIKE ? OR u.phone ILIKE ? OR target_u.fullname ILIKE ? OR target_u.phone ILIKE ?)
 
-	if searchQuery == "" {
-		countQuery = `
-        SELECT COUNT(*)
-        FROM transactions t
-        WHERE t.user_id = ? AND t.is_deleted = false`
+    UNION ALL
 
-		queryArgs = []interface{}{id}
-	} else {
-		countQuery =
-			`SELECT COUNT(*)
-        FROM transactions t
-        LEFT JOIN users u ON t.user_id = u.id
-        WHERE t.user_id = ? AND t.is_deleted = false
-        AND (
-            u.fullname ILIKE ? OR u.phone ILIKE ?
-        )`
+    -- Transfers where the user is the recipient (Received)
+    SELECT t.id
+    FROM users u
+    JOIN transactions t ON u.id = t.user_id
+    JOIN transfer_transactions tt ON tt.transaction_id = t.id
+    JOIN users target_u ON target_u.id = tt.target_user_id
+    WHERE tt.target_user_id = ?
+      AND (target_u.fullname ILIKE ? OR target_u.phone ILIKE ? OR u.fullname ILIKE ? OR u.phone ILIKE ?)
 
-		searchParam := "%" + searchQuery + "%"
-		queryArgs = []interface{}{id, searchParam, searchParam}
-	}
+    UNION ALL
 
-	if err := initializers.DB.Raw(countQuery, queryArgs...).Scan(&totalCount).Error; err != nil {
+    -- Top-up history (Top-Up)
+    SELECT t.id
+    FROM users u
+    JOIN transactions t ON u.id = t.user_id
+    JOIN topup_transactions tu ON tu.transaction_id = t.id
+    JOIN payment_methods pm ON pm.id = tu.payment_method_id
+    WHERE t.user_id = ?
+      AND pm.name ILIKE ?
+) AS total_transactions;`
+
+	// Execute count query
+	if err := initializers.DB.Raw(
+		countQuery,
+		id, searchQuery, searchQuery, searchQuery, searchQuery, // Sent
+		id, searchQuery, searchQuery, searchQuery, searchQuery, // Received
+		id, searchQuery, // Top-Up
+	).Scan(&totalCount).Error; err != nil {
 		response.InternalServerError("Failed to count transactions", err.Error())
 		return
 	}
 
-	// Menghitung total halaman untuk pagination
+	// Calculate total pages for pagination
 	totalPages := int(math.Ceil(float64(totalCount) / float64(limit)))
 
-	// Membuat info pagination
+	// Create pagination info
 	pageInfo := &lib.PageInfo{
 		CurrentPage: page,
-		NextPage:    page + 1,
-		PrevPage:    page - 1,
+		NextPage:    0,
+		PrevPage:    0,
 		TotalPage:   totalPages,
 		TotalData:   int(totalCount),
 	}
-	if page >= totalPages {
-		pageInfo.NextPage = 0
+	if page < totalPages {
+		pageInfo.NextPage = page + 1
 	}
-	if page <= 1 {
-		pageInfo.PrevPage = 0
+	if page > 1 {
+		pageInfo.PrevPage = page - 1
 	}
 
-	// Mengembalikan response sukses
+	// Return success response
 	response.GetAllSuccess("Success get transaction history", transactions, pageInfo)
 }
 
